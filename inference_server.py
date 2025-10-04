@@ -73,5 +73,6 @@ def check_images_batch():
 # PASO 3: PONER EN MARCHA EL SERVIDOR
 # --------------------------------------------------------------------------
 if __name__ == '__main__':
-    # Esto inicia el servidor y lo pone a la escucha de peticiones en el puerto 5000.
-    app.run(host='0.0.0.0', port=5000)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
