@@ -14,5 +14,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 8080
 
-# Usa Uvicorn (servidor de FastAPI)
-CMD ["uvicorn", "inference_server:app", "--host", "0.0.0.0", "--port", "8080"]
+# Arrancar Flask con Gunicorn
+CMD ["gunicorn", "inference_server:app", "--workers=1", "--threads=2", "--bind=0.0.0.0:8080", "--timeout=120"]
