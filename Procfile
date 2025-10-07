@@ -1,1 +1,1 @@
-web: uvicorn inference_server:app --host 0.0.0.0 --port 8080
+web: gunicorn inference_server:app --workers=1 --threads=2 --timeout=120

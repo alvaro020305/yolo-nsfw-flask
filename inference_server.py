@@ -1,17 +1,15 @@
 import os
 import gc
 import torch
-from fastapi import FastAPI, File, UploadFile, Request
-from fastapi.responses import JSONResponse
+from flask import Flask, request, jsonify
 from ultralytics import YOLO
 from PIL import Image
-import uvicorn
 
 # --- Configuración ---
 NSFW_LABELS = {"penis", "anus", "make_love"}
 model = None
 
-app = FastAPI(title="ERA-X Anti NSFW API", version="1.1")
+app = Flask(__name__)
 
 
 # --- Lazy load del modelo ---
@@ -30,17 +28,22 @@ def get_model():
 
 
 # --- Endpoint principal ---
-@app.post("/check_batch")
-async def check_images_batch(request: Request, images: list[UploadFile] = File(...)):
+@app.route("/check_batch", methods=["POST"])
+def check_images_batch():
     try:
         model_instance = get_model()
     except Exception as e:
         print(f"❌ Error cargando modelo: {e}")
-        return JSONResponse(status_code=500, content={"error": "No se pudo cargar el modelo."})
+        return jsonify({"error": "No se pudo cargar el modelo."}), 500
+
+    if "images" not in request.files:
+        return jsonify({"error": "No se recibió el campo 'images'."}), 400
+
+    image_files = request.files.getlist("images")
 
     try:
-        for image_file in images:
-            image = Image.open(image_file.file)
+        for image_file in image_files:
+            image = Image.open(image_file.stream).convert("RGB")
             results = model_instance(image, conf=0.2, iou=0.3, verbose=False)
 
             if len(results) > 0 and len(results[0].boxes) > 0:
@@ -53,14 +56,14 @@ async def check_images_batch(request: Request, images: list[UploadFile] = File(.
                         print(f"🚨 NSFW detectado: {label_name}")
                         torch.cuda.empty_cache()
                         gc.collect()
-                        return {"is_nsfw": True, "label": label_name}
+                        return jsonify({"is_nsfw": True, "label": label_name})
 
         print("✅ Lote procesado. Sin contenido NSFW.")
-        return {"is_nsfw": False}
+        return jsonify({"is_nsfw": False})
 
     except Exception as e:
         print(f"⚠️ Error procesando imagen: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return jsonify({"error": str(e)}), 500
 
     finally:
         torch.cuda.empty_cache()
@@ -68,21 +71,13 @@ async def check_images_batch(request: Request, images: list[UploadFile] = File(.
 
 
 # --- Endpoint de salud ---
-@app.get("/ping")
-async def ping():
-    return {"status": "ok"}
+@app.route("/ping", methods=["GET"])
+def ping():
+    return jsonify({"status": "ok"})
 
 
-# --- Middleware para cerrar conexiones persistentes (evita 502) ---
-@app.middleware("http")
-async def add_connection_close_header(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["Connection"] = "close"
-    return response
-
-
-# --- Inicio del servidor ---
+# --- Run del servidor ---
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-    print(f"🚀 Servidor FastAPI corriendo en http://0.0.0.0:{port}")
-    uvicorn.run("inference_server:app", host="0.0.0.0", port=port)
+    print(f"🚀 Servidor Flask corriendo en http://0.0.0.0:{port}")
+    app.run(host="0.0.0.0", port=port)
