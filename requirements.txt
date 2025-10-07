@@ -1,7 +1,8 @@
-flask
+fastapi
+uvicorn
 pillow
 ultralytics==8.3.204
 torch==2.5.1+cpu
 torchvision==0.20.1+cpu
---extra-index-url https://download.pytorch.org/whl/cpu
 opencv-python-headless
+--extra-index-url https://download.pytorch.org/whl/cpu
